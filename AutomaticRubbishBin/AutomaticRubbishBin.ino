@@ -1,210 +1,171 @@
+//C++
+#include <ESP32Servo.h> //เรียกใช้ ribrary ของ servo motor 
+#include <Ultrasonic.h> //เรียกใช้ ribrary ของ ultrasonic
 
-#include <AFMotor.h>      //add Adafruit Motor Shield library
-#include <Servo.h>        //add Servo Motor library            
-#include <NewPing.h>      //add Ultrasonic sensor library
-#include <Ultrasonic.h>
+Servo myservo;          //เปลี่ยนชื่อตัวแปรของ servo ให้เป็น myservo
 
-Ultrasonic ultrasonic1(A0, A1);	// An ultrasonic sensor HC-04
-Ultrasonic ultrasonic2(A2, A3);		// An ultrasonic sensor PING)))
+const int pul = 13;     //กำหนด pin 13 ให้เป็นขาที่ส่งสัญญาณ pulse 
+const int dir = 12;     //กำหนด pin 12 ให้เป็นขาที่ส่งสัญญาณ direct
+const int ena = 14;     //กำหนด pin 14 ให้เป็นขาที่ส่งสัญญาณ enable
 
-#define TRIG_PIN A0 // Pin A0 on the Motor Drive Shield soldered to the ultrasonic sensor
-#define ECHO_PIN A1 // Pin A1 on the Motor Drive Shield soldered to the ultrasonic sensor
-#define TRIG_PIN2 A2 // Pin A2 -> add ultasonic2 -aung
-#define ECHO_PIN2 A3 // Pin A3 -> add ultasonic2 -aung
-#define MAX_DISTANCE 300 // sets maximum useable sensor measuring distance to 300cm
-#define MAX_DISTANCE2 300 // add ultasonic2 -aung
-#define MAX_SPEED 160 // sets speed of DC traction motors to 150/250 or about 70% of full speed - to get power drain down.
-#define MAX_SPEED_OFFSET 40 // this sets offset to allow for differences between the two DC traction motors
-#define COLL_DIST 30 // sets distance at which robot stops and reverses to 30cm
-#define TURN_DIST COLL_DIST+20 // sets distance at which robot veers away from object
-NewPing sonar(TRIG_PIN, ECHO_PIN, MAX_DISTANCE); // sets up sensor library to use the correct pins to measure distance.//rotage sonar -aung
-NewPing sonar2(TRIG_PIN2, ECHO_PIN2, MAX_DISTANCE2);// add sonar2 -aung
-AF_DCMotor leftMotor1(1, MOTOR12_1KHZ); // create motor #1 using M1 output on Motor Drive Shield, set to 1kHz PWM frequency
-AF_DCMotor leftMotor2(2, MOTOR12_1KHZ); // create motor #2, using M2 output, set to 1kHz PWM frequency
-AF_DCMotor rightMotor1(3, MOTOR34_1KHZ);// create motor #3, using M3 output, set to 1kHz PWM frequency
-AF_DCMotor rightMotor2(4, MOTOR34_1KHZ);// create motor #4, using M4 output, set to 1kHz PWM frequency
-Servo myservo;  // create servo object to control a servo 
-int detect_R = A4; // Pin A4-> add Infrared sensor_R - aung
-int detect_L = A5; // Pin A5-> add Infrared sensor_L - aung
-int IR_value_R; // aung
-int IR_value_L; // aung
-int leftDistance, rightDistance; //distances on either side
-int curDist = 0;
-int curDist2 = 0;// add ultasonic2 -aung
-String motorSet = "";
-int speedSet = 0;
+#define BUTTON_PIN 33   //กำหนด pin 33 ให้เปิน switch เริ่มทำงาน
+int val = 0;            //ประกาศตัวแปรเพื่อรออ่านค่าจาก switch แล้วนำไปใช้งานต่อ
+int sensorPin = 25;     //กำหนด pin 25 ให้รอรับ input จาก sensor
+int valSensor = 0;      //ประกาศตัวแปรเพื่อรออ่านค่าจาก sensor
+int LED1 = 23;          //กำหนดให้ pin 23 ให้เป็นขาที่ควบคุม led1
+int LED2 = 22;          //กำหนดให้ pin 22 ให้เป็นขาที่ควบคุม led2
+int servo = 26;         //กำหนดให้ pin 26 ใหเป็นขาที่ควบคุม servo motor
 
-//-------------------------------------------- SETUP LOOP ----------------------------------------------------------------------------
-void setup() {
-  Serial.begin(115200);
-  pinMode(detect_R,INPUT);// set pin as input - aung
-  pinMode(detect_L,INPUT);// set pin as input - aung
-  myservo.attach(10);  // attaches the servo on pin 10 (SERVO_1 on the Motor Drive Shield to the servo object 
-  myservo.write(90); // tells the servo to position at 90-degrees ie. facing forward.
-  delay(1000); // delay for one seconds
- }
-//------------------------------------------------------------------------------------------------------------------------------------
+Ultrasonic ultrasonic1(15, 2);	    //ประกาศตัวแปร ultrasonic1 และกำหนดให้ขา 15 เป็น trig และขา 2 ให้เป็น echo
+Ultrasonic ultrasonic2(18, 19);	    //ประกาศตัวแปร ultrasonic2 และกำหนดให้ขา 18 เป็น trig และขา 19 ให้เป็น echo
 
-//---------------------------------------------MAIN LOOP ------------------------------------------------------------------------------
-void loop() {
-  myservo.write(90);  // move eyes forward
-  delay(90);
-  //curDist = readPing();   // read distance
-  //curDist2 = readPing2();   // read distance ->add sonar 2 -aung
 
-  curDist = ultrasonic1.read();
-  curDist2 = ultrasonic2.read();
-  IR_value_R = analogRead(detect_R); // read distance IR sensor_R- aung
-  IR_value_L = analogRead(detect_L); // read distance IR sensor_L - aung
-  
-  //if ((curDist < COLL_DIST)||(curDist2 < COLL_DIST)||(IR_value_R < 100)||(IR_value_L < 100)) {changePath();}
-  if ((curDist < COLL_DIST)||(curDist2 < COLL_DIST)) {changePath();}
-  Serial.print("Sen1 ");
-  Serial.println(curDist);
-  Serial.print("Sen2 ");
-  Serial.println(curDist2);
-  // if forward is blocked change direction
-  moveForward();  // move forward
-  //delay(500);
-  delay(5);// deduce delay for short distance 
+void setup() {              //setup เมื่อเปิดเครื่องคำสั่งในนี้จะทำงานเพียงครั้งเดียว
+  Serial.begin(115200);     //กำหนดความเร็วที่ส่งข้อมูลผ่าน serial port เป็น 115200 byte per secound
+  pinMode(LED1, OUTPUT);    //กำหนดให้ LED1 ให้เป็น output
+  pinMode(LED2, OUTPUT);    //กำหนดให้ LED2 ให้เป็น output
+  pinMode(dir, OUTPUT);     //กำหนดให้ dir เป็น OUTPUT
+  pinMode(pul,OUTPUT);      //กำหนดให้ pul เป็น OUTPUT
+  pinMode(ena, OUTPUT);     //กำหนดให้ ena เป็น OUTPUT
+  pinMode(sensorPin, INPUT);//กำหนดให้ sensorPin เป็น input
+  pinMode(BUTTON_PIN, INPUT_PULLUP);  //กำหนดให้ขา BUTTON_PIN เป็น switch เปิดปิด
+  myservo.attach(servo);    //เมื่อเรียกใช้ myservo ให้ส่งข้อมูลผ่านขาที่กำหนดค่าไว้ในตัวแปร servo
+}
+
+void loop() {                   //loop คำสั่งทั้งหมดในนี้จะทำงานวนซ้ำเรื่อยๆไม่สิ้นสุด
+  digitalWrite(ena,HIGH);       //
+  myservo.write(190);           //สั่งให้ servo motor หมุนไปที่ 180 องศา
+
+  int countSen1 = ultrasonic1.read();   //ประกาศตัวแปร countSen1 เพื่อรับค่าที่ ultrasonic1 อ่านได้
+  int countSen2 = ultrasonic2.read();   //ประกาศตัวแปร countSen2 เพื่อรับค่าที่ ultrasonic2 อ่านได้
+
+  //LED ทั้งสองหลอดถ้าสั่ง HIGH มันจะดับและ LOW มันจะติดเนื่องจากต่อสายสลับกันคำสั่งมันเลยสลับกันขก.ต่อใหม่ครับ
+
+  //เงื่อนไข 2 ตัวจากนี้คือถ้าหากขยะเต็มถังจะทำให้ระบบทั้งหมดไม่ทำงานต่อนอกจากไฟที่แสดงสถานะว่าขยะเต็ม
+  if(countSen1 <= 10){          //สร้างเงื่อนไขถ้าหากค่าที่รับมาจาก ultrasonic1 น้อยกว่าหรือเท่ากับ 10 ให้ทำงานในสโคปนี้
+    digitalWrite(LED2, HIGH);   //สั่งให้ LED2 ดับ 
+    digitalWrite(LED1, HIGH);   //สั่งให้ LED1 ดับ
+    delay(350);                 //หน่วงเวลา 0.35 
+    digitalWrite(LED1, LOW);    //สั่งให้ LED1 ติด
+    delay(350);                 //หน่วงเวลา 0.35 วิ
+    ESP.restart();              //สั่งให้บอร์ด ESP restart เพื่อไม่ให้คำสั่งที่อยู่หลังจากนี้ทำงาน จริงๆมีวิธีที่ดีกว่านี้แต่เนื่องจากปัญหาหลายอย่างเลยเลือกวิธีนี้
   }
-//-------------------------------------------------------------------------------------------------------------------------------------
 
-void changePath() {
-  moveStop();   // stop forward movement
-  moveBackward(); //add back word-aung
-  delay(150);//add move delay-aung
-  moveStop();//add stop-aung
-  myservo.write(36);  // check distance to the right
-    delay(500);
-    rightDistance = ultrasonic1.read(); //set right distance
-    delay(500);
-    myservo.write(144);  // check distace to the left
-    delay(700);
-    leftDistance = ultrasonic1.read(); //set left distance
-    delay(500);
-    myservo.write(90); //return to center
-    delay(100);
-    compareDistance();
+  if(countSen2 <= 10){          //สร้างเงื่อนไขถ้าหากค่าที่รับมาจาก ultrasonic2 น้อยกว่าหรือเท่ากับ 10 ให้ทำงานในสโคปนี้
+    digitalWrite(LED2, HIGH);   //สั่งให้ LED2 ดับ 
+    digitalWrite(LED1, HIGH);   //สั่งให้ LED1 ดับ
+    delay(350);                 //หน่วงเวลา 0.35 วิ
+    digitalWrite(LED1, LOW);    //สั่งให้ LED1 ติด
+    delay(350);                 //หน่วงเวลา 0.35 วิ
+    ESP.restart();              //สั่งให้บอร์ด ESP restart เพื่อไม่ให้คำสั่งที่อยู่หลังจากนี้ทำงาน จริงๆมีวิธีที่ดีกว่านี้แต่เนื่องจากปัญหาหลายอย่างเลยเลือกวิธีนี้
   }
 
   
-void compareDistance()   // find the longest distance
-{
-  if (leftDistance>rightDistance) //if left is less obstructed 
-  {
-    turnLeft();
-  }
-  else if (rightDistance>leftDistance) //if right is less obstructed
-  {
-    turnRight();
-  }
-   else //if they are equally obstructed
-  {
-    turnAround();
-  }
-}
+  //ไฟสีฟ้าแสดงสถานะพร้อมใช้งาน
+  digitalWrite(LED1, HIGH);     //สั่งให้ LED1 ดับ
+  digitalWrite(LED2, HIGH);     //สั่งให้ LED2 ดับ
+  delay(500);                   //หน่วงเวลา 0.5 วิ
+  digitalWrite(LED2, LOW);      //สั่งให้ LED2 ติด
+  delay(500);                   //หน่วงเวลา 0.5 วิ
+
+  
+  //แสดงข้อความผ่านและค่าที่รับมาจาก ultrasonic ผ่านทาง serial monitor
+  Serial.print("Sensor 01: ");   //แสดงข้อความ Sensor 01: 
+  Serial.print(countSen1);       //แสดงค่าที่รับมาจาก ultrasonic1 ผ่านตัวแปร countSen1
+  Serial.println("cm");          //แสดงข้อความ cm และขึ้นบรรทัดใหม่ println เป็นคำสั่งแสดงข้อความนั้นๆและขึ้นบรรทัดใหม่
+
+  Serial.print("Sensor 02: ");   //แสดงข้อความ Sensor 02: 
+  Serial.print(countSen2);       //แสดงค่าที่รับมาจาก ultrasonic2 ผ่านตัวแปร countSen2
+  Serial.println("cm");          //แสดงข้อความ cm และขึ้นบรรทัดใหม่
 
 
-//-------------------------------------------------------------------------------------------------------------------------------------
-// rotage sonar
-int readPing() { // read the ultrasonic sensor distance
-  delay(70);   
-  unsigned int uS = sonar.ping();
-  int cm = uS/US_ROUNDTRIP_CM;
-  return cm;
+  valSensor = digitalRead(sensorPin);   //อ่านค่าจาก sensor ผ่านตัวแปร sensorPin และให้ตัวแปร valsensor เก็บค่าไว้
+  val = digitalRead(BUTTON_PIN);        //อ่านค่าจาก switch ผ่านตัวแปร BUTTON_PIN และเก็บค่าไว้ที่ตัวแปร val
+
+  //เมื่อกด switch ค่าของตัวแปร val จะเท่ากับ LOW ถ้าไม่กดจะเท่ากับ HIGH
+  //ตัวแปร ena เมื่อเป็น HIGH จะทำให้ motor driver ตัดไฟที่ส่งไปเลี้ยงตัว motor และถ้าเป็น LOW จะทำให้ motor driver ส่งไฟไปเลี้ยงตัว motor 
+  if (val == LOW){            //เงื่อนไขนี้จะทำงานเมื่อกด switch        
+    digitalWrite(ena,LOW);    //สั่ง motor driver ให้จ่ายไฟเลี้ยงไปยัง motor
+    
+    if (valSensor == 1){      //เงื่อนไขนี้ทำงานเมื่อ sensor ไม่เจอโลหะ
+      bin1();                 //function นี้เป็นการสั่งให้ motor หมุนไปที่ถังขยะใบที่ 1 ซึ่งเป็นถังของพลาสติก (สร้าง Function ไว้ข้างล่าง บรรทัด 105)
+      delay(500);             //หน่วงเวลา 0.5 วิ
+    }
+    if (valSensor == 0){      //เงื่อนไขนี้ทำงานเมื่อ sensor ตรวจเจอโลหะ
+      bin2();                 //function นี้เป็นการสั่งให้ motor หมุนไปที่ถังขยะใบที่ 2 ซึ่งเป็นถังของโลหะ (สร้าง Function ไว้ข้างล่าง บรรทัด 135)
+      delay(500);             //หน่วงเวลา 0.5 วิ
+    }
+  }
+  ESP.restart();              //สั่งให้บอร์ด ESP restart
+}     //จบLoop
+
+
+
+  //สร้าง Function bin1 และ bin2
+void bin1(){ //function ของถังพลาสติก
+    
+    // 0.45 องศา / 1step
+    for (int i=0; i < 1000; i++) //กำหนดให้สเต็ปมอเตอร์หมุน 1000 pulse โดยการทำให้ลูปนี้วนซ้ำ 1000 รอบ
+    {
+    //ลูปนี้สั่งให้ motor หมุนตามเข็มคือหมุนไปที่ถัง
+    digitalWrite(ena,LOW);  //สั่งจ่ายไฟให้ motor
+    digitalWrite(dir,HIGH); //ทำการเลือกให้ motor หมุนตามเข็ม
+    digitalWrite(pul,HIGH); //สร้างสัญญาณ pulse 1 ลูก
+    delayMicroseconds(500); //หน่วงเวลา 0.05วิ ใช่ไหมวะไม่แน่ใจไมโครอะ
+    digitalWrite(pul,LOW);  //ดับสัญญาณ pulse เพื่อให้รอบต่อไปส่งสัญต่อได้ถ้า HIGH แล้วไม่สั่งให้ LOW ลูปล้านรอบมันก็นับเป็น 1
+    delayMicroseconds(500); //หน่วงเวลา 0.05วิ ใช่ไหมวะไม่แน่ใจไมโครอะ
+    }
+  
+    //สั่งให้ servo motor เปิดและปิด
+    delay(500);           //หน่วงเวลา 0.5 วิ 
+    myservo.write(90);    //สั่งให้ servo motor เปิดโดยหมุนไปที่องศาที่ 90   
+    delay(500);           //หน่วงเวลา 0.5 วิ
+    myservo.write(190);   //สั่งให้ servo motor ปิดโดยหมุนไปที่องศาที่ 180 
+    delay(1500);          //หน่วงเวลา 1.5 วิ
+
+
+    for (int i=0; i < 1000; i++) //กำหนดให้สเต็ปมอเตอร์หมุน 1000 pulse โดยการทำให้ลูปนี้วนซ้ำ 1000 รอบ
+    {
+    //ลูปนี้สั่งให้ motor หมุนทวนเข็มคือหมุนกลับไปที่จุดเดิม
+    digitalWrite(dir,LOW);      //ทำการเลือกให้ motor หมุนทวนเข็ม
+    digitalWrite(pul,HIGH);     //สร้างสัญญาณ pulse 1 ลูก
+    delayMicroseconds(500);     //หน่วงเวลา 0.05วิ ใช่ไหมวะไม่แน่ใจไมโครอะ
+    digitalWrite(pul,LOW);      //ดับสัญญาณ pulse เพื่อให้รอบต่อไปส่งสัญต่อได้ถ้า HIGH แล้วไม่สั่งให้ LOW ลูปล้านรอบมันก็นับเป็น 1
+    delayMicroseconds(500);     //หน่วงเวลา 0.05วิ ใช่ไหมวะไม่แน่ใจไมโครอะ
+    }
+    delay(1000);                //หน่วงเวลา 1 วิ
 }
 
-// fix sonar2
-int readPing2() { // read the ultrasonic sensor2 distance-aung
-  delay(70);   
-  unsigned int uS = sonar2.ping();
-  int cm = uS/US_ROUNDTRIP_CM;
-  return cm;
-}
+void bin2(){ //function ของถังโลหะ
+    
+    // 0.45 องศา / 1step
+    for (int i=0; i < 3350; i++) //กำหนดให้สเต็ปมอเตอร์หมุน 3350 pulse โดยการทำให้ลูปนี้วนซ้ำ 3350 รอบ
+    {
+    //ลูปนี้สั่งให้ motor หมุนตามเข็มคือหมุนไปที่ถัง
+    digitalWrite(ena,LOW);  //สั่งจ่ายไฟให้ motor
+    digitalWrite(dir,HIGH); //ทำการเลือกให้ motor หมุนตามเข็ม
+    digitalWrite(pul,HIGH); //สร้างสัญญาณ pulse 1 ลูก
+    delayMicroseconds(500); //หน่วงเวลา 0.05วิ ใช่ไหมวะไม่แน่ใจไมโครอะ
+    digitalWrite(pul,LOW);  //ดับสัญญาณ pulse เพื่อให้รอบต่อไปส่งสัญต่อได้ถ้า HIGH แล้วไม่สั่งให้ LOW ลูปล้านรอบมันก็นับเป็น 1
+    delayMicroseconds(500); //หน่วงเวลา 0.05วิ ใช่ไหมวะไม่แน่ใจไมโครอะ
+    }
+  
+    //สั่งให้ servo motor เปิดและปิด
+    delay(500);           //หน่วงเวลา 0.5 วิ 
+    myservo.write(90);    //สั่งให้ servo motor เปิดโดยหมุนไปที่องศาที่ 90   
+    delay(500);           //หน่วงเวลา 0.5 วิ
+    myservo.write(190);   //สั่งให้ servo motor ปิดโดยหมุนไปที่องศาที่ 180 
+    delay(1500);          //หน่วงเวลา 1.5 วิ
 
-//-------------------------------------------------------------------------------------------------------------------------------------
-void moveStop() {leftMotor1.run(RELEASE); leftMotor2.run(RELEASE); rightMotor1.run(RELEASE); rightMotor2.run(RELEASE);}  // stop the motors.
-//-------------------------------------------------------------------------------------------------------------------------------------
-void moveForward() {
-    motorSet = "FORWARD";
-    leftMotor1.run(FORWARD);      // turn it on going forward
-    leftMotor2.run(FORWARD);      // turn it on going forward
-    rightMotor1.run(FORWARD);     // turn it on going forward
-    rightMotor2.run(FORWARD);     // turn it on going forward
-  for (speedSet = 0; speedSet < MAX_SPEED; speedSet +=2) // slowly bring the speed up to avoid loading down the batteries too quickly
-  {
-    leftMotor1.setSpeed(speedSet);
-    leftMotor2.setSpeed(speedSet);
-    rightMotor1.setSpeed(speedSet); 
-    rightMotor2.setSpeed(speedSet);
-    //delay(5);
-  }
+
+    for (int i=0; i < 3350; i++) //กำหนดให้สเต็ปมอเตอร์หมุน 3350 pulse โดยการทำให้ลูปนี้วนซ้ำ 3350 รอบ
+    {
+    //ลูปนี้สั่งให้ motor หมุนทวนเข็มคือหมุนกลับไปที่จุดเดิม
+    digitalWrite(dir,LOW);      //ทำการเลือกให้ motor หมุนทวนเข็ม
+    digitalWrite(pul,HIGH);     //สร้างสัญญาณ pulse 1 ลูก
+    delayMicroseconds(500);     //หน่วงเวลา 0.05วิ ใช่ไหมวะไม่แน่ใจไมโครอะ
+    digitalWrite(pul,LOW);      //ดับสัญญาณ pulse เพื่อให้รอบต่อไปส่งสัญต่อได้ถ้า HIGH แล้วไม่สั่งให้ LOW ลูปล้านรอบมันก็นับเป็น 1
+    delayMicroseconds(500);     //หน่วงเวลา 0.05วิ ใช่ไหมวะไม่แน่ใจไมโครอะ
+    }
+    delay(1000);                //หน่วงเวลา 1 วิ
 }
-//-------------------------------------------------------------------------------------------------------------------------------------
-void moveBackward() {
-    motorSet = "BACKWARD";
-    leftMotor1.run(BACKWARD);     // turn it on going backward
-    leftMotor2.run(BACKWARD);     // turn it on going backward
-    rightMotor1.run(BACKWARD);    // turn it on going backward
-    rightMotor2.run(BACKWARD);    // turn it on going backward
-  for (speedSet = 0; speedSet < MAX_SPEED; speedSet +=2) // slowly bring the speed up to avoid loading down the batteries too quickly
-  {
-    leftMotor1.setSpeed(speedSet);
-    leftMotor2.setSpeed(speedSet);
-    rightMotor1.setSpeed(speedSet); 
-    rightMotor2.setSpeed(speedSet); 
-    delay(5);
-  }
-}  
-//-------------------------------------------------------------------------------------------------------------------------------------
-void turnRight() {
-  motorSet = "RIGHT";
-  leftMotor1.run(FORWARD);      // turn motor 1 forward
-  leftMotor2.run(FORWARD);      // turn motor 2 forward
-  rightMotor1.run(BACKWARD);    // turn motor 3 backward
-  rightMotor2.run(BACKWARD);    // turn motor 4 backward
-  rightMotor1.setSpeed(speedSet+MAX_SPEED_OFFSET);      
-  rightMotor2.setSpeed(speedSet+MAX_SPEED_OFFSET);     
-  //delay(1500); // run motors this way for 1500   
-  delay(1800);//700aung     
-  motorSet = "FORWARD";
-  leftMotor1.run(FORWARD);      // set both motors back to forward
-  leftMotor2.run(FORWARD);
-  rightMotor1.run(FORWARD);
-  rightMotor2.run(FORWARD);      
-}  
-//-------------------------------------------------------------------------------------------------------------------------------------
-void turnLeft() {
-  motorSet = "LEFT";
-  leftMotor1.run(BACKWARD);      // turn motor 1 backward
-  leftMotor2.run(BACKWARD);      // turn motor 2 backward
-  leftMotor1.setSpeed(speedSet+MAX_SPEED_OFFSET);     
-  leftMotor2.setSpeed(speedSet+MAX_SPEED_OFFSET);    
-  rightMotor1.run(FORWARD);     // turn motor 3 forward
-  rightMotor2.run(FORWARD);     // turn motor 4 forward
-  //delay(1500); // run motors this way for 1500  
-  delay(1800);//700aung
-  motorSet = "FORWARD";
-  leftMotor1.run(FORWARD);      // turn it on going forward
-  leftMotor2.run(FORWARD);      // turn it on going forward
-  rightMotor1.run(FORWARD);     // turn it on going forward
-  rightMotor2.run(FORWARD);     // turn it on going forward
-}  
-//-------------------------------------------------------------------------------------------------------------------------------------
-void turnAround() {
-  motorSet = "RIGHT";
-  leftMotor1.run(FORWARD);      // turn motor 1 forward
-  leftMotor2.run(FORWARD);      // turn motor 2 forward
-  rightMotor1.run(BACKWARD);    // turn motor 3 backward
-  rightMotor2.run(BACKWARD);    // turn motor 4 backward
-  rightMotor1.setSpeed(speedSet+MAX_SPEED_OFFSET);      
-  rightMotor2.setSpeed(speedSet+MAX_SPEED_OFFSET);
-  //delay(1700); // run motors this way for 1700
-  delay(3000);//aung
-  motorSet = "FORWARD";
-  leftMotor1.run(FORWARD);      // set both motors back to forward
-  leftMotor2.run(FORWARD);
-  rightMotor1.run(FORWARD);
-  rightMotor2.run(FORWARD);      
-}  
